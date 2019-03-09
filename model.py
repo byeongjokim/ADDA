@@ -1,7 +1,6 @@
 import tensorflow as tf
 class Model(object):
     def __init__(self):
-        print("a")
         self.mu = 0
         self.sigma = 0.1
 
@@ -12,7 +11,7 @@ class Model(object):
 
     def lenet_source_CNN(self, image):
         with tf.variable_scope("source_cnn"):
-            conv1_w = tf.Variable(tf.truncated_normal(shape=[5, 5, 1, 6], mean=self.mu, stddev=self.sigma))
+            conv1_w = tf.Variable(tf.truncated_normal(shape=[5, 5, 3, 6], mean=self.mu, stddev=self.sigma))
             conv1_b = tf.Variable(tf.zeros(6))
             conv1 = tf.nn.conv2d(image, conv1_w, strides=[1, 1, 1, 1], padding='VALID') + conv1_b
             conv1 = tf.nn.relu(conv1)
@@ -29,7 +28,7 @@ class Model(object):
 
     def lenet_target_CNN(self, image):
         with tf.variable_scope("target_cnn"):
-            conv1_w = tf.Variable(tf.truncated_normal(shape=[5, 5, 1, 6], mean=self.mu, stddev=self.sigma))
+            conv1_w = tf.Variable(tf.truncated_normal(shape=[5, 5, 3, 6], mean=self.mu, stddev=self.sigma))
             conv1_b = tf.Variable(tf.zeros(6))
             conv1 = tf.nn.conv2d(image, conv1_w, strides=[1, 1, 1, 1], padding='VALID') + conv1_b
             conv1 = tf.nn.relu(conv1)
@@ -45,7 +44,7 @@ class Model(object):
             return fc1
 
     def lenet_classification(self, fc1):
-        with tf.variable_scope("classification"):
+        with tf.variable_scope("classifier"):
             fc1_w = tf.Variable(tf.truncated_normal(shape=(400, 120), mean=self.mu, stddev=self.sigma))
             fc1_b = tf.Variable(tf.zeros(120))
             fc1 = tf.matmul(fc1, fc1_w) + fc1_b
@@ -63,7 +62,7 @@ class Model(object):
             return logits
 
     def discriminate(self, fc1):
-        with tf.variable_scope("discriminate", reuse=True):
+        with tf.variable_scope("discriminater", reuse=True):
             fc1_w = tf.Variable(tf.truncated_normal(shape=(400, 120)))
             fc1_b = tf.Variable(tf.zeros(120))
             fc1 = tf.matmul(fc1, fc1_w) + fc1_b
@@ -80,13 +79,33 @@ class Model(object):
             logits = tf.matmul(fc2, fc3_w) + fc3_b
             return logits
 
-    def loss_function(self):
-        source_M = self.lenet_source_CNN(self.S)
-        target_M = self.lenet_target_CNN(self.T)
-        cls = self.lenet_classification(source_M)
-        D_source = self.discriminate(source_M)
-        D_target = self.discriminate(target_M)
+    def loss_function(self, opt):
+        if(opt == "pretrain"):
+            source_M = self.lenet_source_CNN(self.S)
+            cls = self.lenet_classification(source_M)
+            self.cls_cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=cls, labels=self.Y))
+            return self.cls_cost, self.S, self.Y
 
-        self.cls_cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=cls, labels=self.Y))
-        self.dis_cost = - tf.reduce_mean(tf.log(D_source) + tf.log(1-D_target))
-        self.target_M_cost = - tf.reduce_mean(tf.log(D_target))
+        if(opt == "train"):
+            source_M = self.lenet_source_CNN(self.S)
+            target_M = self.lenet_target_CNN(self.T)
+
+            D_source = self.discriminate(source_M)
+            D_target = self.discriminate(target_M)
+
+            self.dis_cost = - tf.reduce_mean(tf.log(D_source) + tf.log(1-D_target))
+            self.target_M_cost = - tf.reduce_mean(tf.log(D_target))
+
+            return self.dis_cost, self.target_M_cost, self.S, self.T
+
+    def source(self):
+        source_M = self.lenet_source_CNN(self.S)
+        cls = self.lenet_classification(source_M)
+        return cls, self.S, self.Y
+
+    def adda(self):
+        target_M = self.lenet_target_CNN(self.T)
+        cls = self.lenet_classification(target_M)
+        return cls, self.T, self.Y
+
+

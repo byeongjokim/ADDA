@@ -54,7 +54,7 @@ def mnist_to_img(x):
     return np.concatenate([d, d, d], 2)
 
 
-def create_mnistm(X):
+def create_mnistm(X, Y):
     """
     Give an array of MNIST digits, blend random background patches to
     build the MNIST-M dataset as described in
@@ -70,15 +70,18 @@ def create_mnistm(X):
         X_[i] = d
         if i % 1000 == 0:
             print('Processing example', i)
-            cv2.imwrite("./_data/mnist_m/examples/" + str(i) + ".jpg", d)
+            cv2.imwrite("./_data/mnist_m/examples/" + str(i) + "_" + str(Y[i]) + ".jpg", d)
     return X_
 
 
 print('Building train set...')
-train = create_mnistm(x_train)
+train = create_mnistm(x_train, y_train)
 print('Building test set...')
-test = create_mnistm(x_test)
+test = create_mnistm(x_test, y_test)
 
 # Save dataset as pickle
 with open('./_data/mnist_m/mnistm_data.pkl', 'wb') as f:
     pkl.dump({'train': train, 'test': test}, f, pkl.HIGHEST_PROTOCOL)
+
+with open('./_data/mnist_m/mnistm_data_y.pkl', 'wb') as f:
+    pkl.dump({'train': y_train, 'test': y_test}, f, pkl.HIGHEST_PROTOCOL)
