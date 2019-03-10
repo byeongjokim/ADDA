@@ -33,7 +33,7 @@ def get_dataset(istest=0):
         mnist_test_X = np.stack([mnist_test_X, mnist_test_X, mnist_test_X], 3)
 
         mnist_test_Y_one_hot = np.zeros((mnist_test_Y.shape[0], 10))
-        mnist_test_Y_one_hot[np.arange(mnist_test_Y.shape[0]), mnist_train_Y] = 1
+        mnist_test_Y_one_hot[np.arange(mnist_test_Y.shape[0]), mnist_test_Y] = 1
 
         mnist_m_test_Y_one_hot = np.zeros((mnist_m_test_Y.shape[0], 10))
         mnist_m_test_Y_one_hot[np.arange(mnist_m_test_Y.shape[0]), mnist_m_test_Y] = 1
@@ -42,8 +42,8 @@ def get_dataset(istest=0):
 
 def train_source():
     batch_size = 30
-    learning_rate = 0.0001
-    epoch = 100
+    learning_rate = 0.001
+    epoch = 500
 
     m = Model()
     loss, S, Y = m.loss_function(opt="pretrain")
@@ -61,17 +61,22 @@ def train_source():
         sess.run(tf.global_variables_initializer())
         saver_source = tf.train.Saver(var_source)
         saver_cls = tf.train.Saver(var_cls)
+        #saver_source.restore(sess, "./_models/source/source.ckpt")
+        #saver_cls.restore(sess, "./_models/classifier/classifier.ckpt")
 
         for e in range(epoch):
             total_cost = 0.0
-            for i in range( int(source_X.shape[0]/batch_size) + 1 ):
+            for i in range(0, source_X.shape[0], batch_size):
                 _, cost = sess.run([optimizer, loss], feed_dict={
                                                     S: source_X[i:i+batch_size],
                                                     Y: source_Y[i:i+batch_size]
                                                   })
                 total_cost = total_cost + cost
 
-            print(e, total_cost/(int(source_X.shape[0] / batch_size) + 1))
+            if(total_cost / int(source_X.shape[0] / batch_size) < 1):
+                break
+
+            print(e, total_cost / int(source_X.shape[0] / batch_size))
 
         saver_source.save(sess, "./_models/source/source.ckpt")
         saver_cls.save(sess, "./_models/classifier/classifier.ckpt")
@@ -107,7 +112,7 @@ def train_adda():
         for e in range(epoch):
             total_cost1 = 0.0
             total_cost2 = 0.0
-            for i in range(int(source_X.shape[0] / batch_size) + 1):
+            for i in range(0, source_X.shape[0], batch_size):
                 _, cost1 = sess.run([optimizer1, loss1], feed_dict={
                     S: source_X[i:i + batch_size],
                     T: target_X[i:i + batch_size]
@@ -120,7 +125,7 @@ def train_adda():
                 total_cost1 = total_cost1 + cost1
                 total_cost2 = total_cost2 + cost2
 
-            print(e, total_cost1/(int(source_X.shape[0] / batch_size) + 1), total_cost2/(int(source_X.shape[0] / batch_size) + 1))
+            print(e, total_cost1/int(source_X.shape[0] / batch_size), total_cost2/int(source_X.shape[0] / batch_size))
 
         saver_target.save(sess, "./_models/target/target.ckpt")
         saver_dis.save(sess, "./_models/discriminater/discriminater.ckpt")
@@ -139,8 +144,8 @@ def test_soruce():
     accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
     target, source = get_dataset(istest=1)
-    target_X, target_Y = target
-    random.shuffle(target_X)
+    #target_X, target_Y = target
+    target_X, target_Y = source
 
     with tf.Session() as sess:
         saver_source = tf.train.Saver(var_source)
@@ -148,15 +153,15 @@ def test_soruce():
         saver_source.restore(sess, "./_models/source/source.ckpt")
         saver_cls.restore(sess, "./_models/classifier/classifier.ckpt")
 
-        total_cost = 0.0
-        for i in range(int(target_X.shape[0] / batch_size) + 1):
-            _, cost = sess.run(accuracy, feed_dict={
+        total_acc = 0.0
+        for i in range(0, target_X.shape[0], batch_size):
+            acc = sess.run(accuracy, feed_dict={
                 S: target_X[i:i + batch_size],
                 Y: target_Y[i:i + batch_size]
             })
-            total_cost = total_cost + cost
+            total_acc = total_acc + acc
 
-        print(total_cost/(int(target_X.shape[0] / batch_size) + 1))
+        print(total_acc / int(target_X.shape[0] / batch_size))
 
 def test_adda():
     batch_size = 30
@@ -181,15 +186,15 @@ def test_adda():
         saver_target.restore(sess, "./_models/target/target.ckpt")
         saver_cls.restore(sess, "./_models/classifier/classifier.ckpt")
 
-        total_cost = 0.0
-        for i in range(int(target_X.shape[0] / batch_size) + 1):
-            _, cost = sess.run(accuracy, feed_dict={
+        total_acc = 0.0
+        for i in range(0, int(target_X.shape[0] / batch_size) + 1, batch_size):
+            acc = sess.run(accuracy, feed_dict={
                 T: target_X[i:i + batch_size],
                 Y: target_Y[i:i + batch_size]
             })
-            total_cost = total_cost + cost
+            total_acc = total_acc + acc
 
-        print(total_cost/(int(target_X.shape[0] / batch_size) + 1))
-
+        print(total_acc / int(target_X.shape[0] / batch_size))
 
 train_source()
+#test_soruce()
