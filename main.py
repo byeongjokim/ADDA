@@ -43,7 +43,7 @@ def get_dataset(istest=0):
 def train_source():
     batch_size = 30
     learning_rate = 0.001
-    epoch = 500
+    epoch = 1
 
     m = Model()
     loss, S, Y = m.loss_function(opt="pretrain")
@@ -83,8 +83,8 @@ def train_source():
 
 def train_adda():
     batch_size = 30
-    learning_rate = 0.0001
-    epoch = 100
+    learning_rate = 0.00001
+    epoch = 1
 
     m = Model()
     loss1, loss2, S, T = m.loss_function(opt="train")
@@ -196,5 +196,7 @@ def test_adda():
 
         print(total_acc / int(target_X.shape[0] / batch_size))
 
-train_source()
+#train_source()
 #test_soruce()
+train_adda()
+#test_adda()

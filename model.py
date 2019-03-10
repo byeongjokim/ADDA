@@ -93,8 +93,8 @@ class Model(object):
             D_source = self.discriminate(source_M)
             D_target = self.discriminate(target_M)
 
-            self.dis_cost = - tf.reduce_mean(tf.log(D_source) + tf.log(1-D_target))
-            self.target_M_cost = - tf.reduce_mean(tf.log(D_target))
+            self.dis_cost = - tf.reduce_mean(tf.log(D_source + 1e-10) + tf.log(1-D_target + 1e-10))
+            self.target_M_cost = - tf.reduce_mean(tf.log(D_target + 1e-10))
 
             return self.dis_cost, self.target_M_cost, self.S, self.T
 
