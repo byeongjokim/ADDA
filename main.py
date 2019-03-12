@@ -43,7 +43,7 @@ def get_dataset(istest=0):
 def train_source():
     batch_size = 30
     learning_rate = 0.001
-    epoch = 1
+    epoch = 1000
 
     m = Model()
     loss, S, Y = m.loss_function(opt="pretrain")
@@ -61,8 +61,8 @@ def train_source():
         sess.run(tf.global_variables_initializer())
         saver_source = tf.train.Saver(var_source)
         saver_cls = tf.train.Saver(var_cls)
-        #saver_source.restore(sess, "./_models/source/source.ckpt")
-        #saver_cls.restore(sess, "./_models/classifier/classifier.ckpt")
+        saver_source.restore(sess, "./_models/source/source.ckpt")
+        saver_cls.restore(sess, "./_models/classifier/classifier.ckpt")
 
         for e in range(epoch):
             total_cost = 0.0
@@ -73,7 +73,7 @@ def train_source():
                                                   })
                 total_cost = total_cost + cost
 
-            if(total_cost / int(source_X.shape[0] / batch_size) < 1):
+            if(total_cost / int(source_X.shape[0] / batch_size) < 0.05):
                 break
 
             print(e, total_cost / int(source_X.shape[0] / batch_size))
@@ -83,31 +83,43 @@ def train_source():
 
 def train_adda():
     batch_size = 30
-    learning_rate = 0.00001
-    epoch = 1
+    learning_rate = 0.001
+    epoch = 50
 
     m = Model()
-    loss1, loss2, S, T = m.loss_function(opt="train")
+    loss1, loss2, cls, S, T, Y = m.loss_function(opt="train")
 
     all_vars = tf.global_variables()
     var_source = [k for k in all_vars if k.name.startswith("source_cnn")]
     var_target = [k for k in all_vars if k.name.startswith("target_cnn")]
     var_dis = [k for k in all_vars if k.name.startswith("discriminater")]
+    var_cls = [k for k in all_vars if k.name.startswith("classifier")]
 
     optimizer1 = tf.train.AdadeltaOptimizer(learning_rate=learning_rate).minimize(loss1, var_list=var_dis)
-    optimizer2 = tf.train.AdadeltaOptimizer(learning_rate=learning_rate).minimize(loss2, var_list=var_target)
+    optimizer2 = tf.train.AdadeltaOptimizer(learning_rate=0.00001).minimize(loss2, var_list=var_target)
+
+    is_correct = tf.equal(tf.argmax(cls, 1), tf.argmax(Y, 1))
+    accuracy = tf.reduce_sum(tf.cast(is_correct, tf.float32))
 
     target, source = get_dataset(istest=0)
     target_X, _ = target
     source_X, _ = source
-    random.shuffle(target_X)
+
+    target_, _ = get_dataset(istest=1)
+    test_X, test_Y = target_
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         saver_source = tf.train.Saver(var_source)
         saver_source.restore(sess, "./_models/source/source.ckpt")
+        saver_cls = tf.train.Saver(var_cls)
+        saver_cls.restore(sess, "./_models/classifier/classifier.ckpt")
         saver_target = tf.train.Saver(var_target)
+        saver_target.restore(sess, "./_models/target_pretrain/source.ckpt")
         saver_dis = tf.train.Saver(var_dis)
+
+        saver_target.restore(sess, "./_models/target/target.ckpt")
+        saver_dis.restore(sess, "./_models/discriminater/discriminater.ckpt")
 
         for e in range(epoch):
             total_cost1 = 0.0
@@ -125,7 +137,20 @@ def train_adda():
                 total_cost1 = total_cost1 + cost1
                 total_cost2 = total_cost2 + cost2
 
-            print(e, total_cost1/int(source_X.shape[0] / batch_size), total_cost2/int(source_X.shape[0] / batch_size))
+            print(e, total_cost1 / int(source_X.shape[0] / batch_size), total_cost2 / int(source_X.shape[0] / batch_size))
+
+            total_acc = 0.0
+            for i in range(0, test_X.shape[0], batch_size):
+                acc = sess.run(accuracy, feed_dict={
+                    T: test_X[i:i + batch_size],
+                    Y: test_Y[i:i + batch_size]
+                })
+                total_acc = total_acc + acc
+
+            print(total_acc / test_X.shape[0])
+
+            if(total_acc / test_X.shape[0] > 0.96):
+                break
 
         saver_target.save(sess, "./_models/target/target.ckpt")
         saver_dis.save(sess, "./_models/discriminater/discriminater.ckpt")
@@ -141,11 +166,11 @@ def test_soruce():
     var_cls = [k for k in all_vars if k.name.startswith("classifier")]
 
     is_correct = tf.equal(tf.argmax(cls, 1), tf.argmax(Y, 1))
-    accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
+    accuracy = tf.reduce_sum(tf.cast(is_correct, tf.float32))
 
     target, source = get_dataset(istest=1)
-    #target_X, target_Y = target
-    target_X, target_Y = source
+    target_X, target_Y = target
+    #target_X, target_Y = source
 
     with tf.Session() as sess:
         saver_source = tf.train.Saver(var_source)
@@ -161,7 +186,7 @@ def test_soruce():
             })
             total_acc = total_acc + acc
 
-        print(total_acc / int(target_X.shape[0] / batch_size))
+        print(total_acc / target_X.shape[0])
 
 def test_adda():
     batch_size = 30
@@ -174,11 +199,10 @@ def test_adda():
     var_cls = [k for k in all_vars if k.name.startswith("classifier")]
 
     is_correct = tf.equal(tf.argmax(cls, 1), tf.argmax(Y, 1))
-    accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
+    accuracy = tf.reduce_sum(tf.cast(is_correct, tf.float32))
 
     target, source = get_dataset(istest=1)
     target_X, target_Y = target
-    random.shuffle(target_X)
 
     with tf.Session() as sess:
         saver_target = tf.train.Saver(var_target)
@@ -187,14 +211,14 @@ def test_adda():
         saver_cls.restore(sess, "./_models/classifier/classifier.ckpt")
 
         total_acc = 0.0
-        for i in range(0, int(target_X.shape[0] / batch_size) + 1, batch_size):
+        for i in range(0, target_X.shape[0], batch_size):
             acc = sess.run(accuracy, feed_dict={
                 T: target_X[i:i + batch_size],
                 Y: target_Y[i:i + batch_size]
             })
             total_acc = total_acc + acc
 
-        print(total_acc / int(target_X.shape[0] / batch_size))
+        print(total_acc / target_X.shape[0])
 
 #train_source()
 #test_soruce()
