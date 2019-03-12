@@ -1,8 +1,9 @@
 import pickle as pkl
 import tensorflow as tf
 import numpy as np
+import getopt
+import sys
 from model import Model
-import random
 
 def get_dataset(istest=0):
     mnist = tf.keras.datasets.mnist
@@ -26,6 +27,7 @@ def get_dataset(istest=0):
 
         mnist_m_train_Y_one_hot = np.zeros((mnist_m_train_Y.shape[0], 10))
         mnist_m_train_Y_one_hot[np.arange(mnist_m_train_Y.shape[0]), mnist_m_train_Y] = 1
+        print("get train dataset")
         return [mnist_train_X, mnist_train_Y_one_hot], [mnist_m_train_X, mnist_m_train_Y_one_hot]
     else:
         mnist_test_X = np.pad(mnist_test_X, ((0, 0), (2, 2), (2, 2)), mode="constant")
@@ -37,6 +39,7 @@ def get_dataset(istest=0):
 
         mnist_m_test_Y_one_hot = np.zeros((mnist_m_test_Y.shape[0], 10))
         mnist_m_test_Y_one_hot[np.arange(mnist_m_test_Y.shape[0]), mnist_m_test_Y] = 1
+        print("get test dataset")
         return [mnist_test_X, mnist_test_Y_one_hot], [mnist_m_test_X, mnist_m_test_Y_one_hot]
 
 def train_source(batch_size=30, learning_rate=0.001, epoch=1000, threshold=0.05):
@@ -210,7 +213,61 @@ def test_adda():
 
         print(total_acc / target_X.shape[0])
 
-#train_source()
-#test_soruce()
-train_adda()
-#test_adda()
+
+def main(argv):
+    epoch = None
+    batch_size = None
+    threshold = None
+    learning_rate = None
+    learning_rate_D = None
+    learning_rate_M = None
+    flag = None
+
+    try:
+        opts, args = getopt.getopt(argv, "h", ["train=", "test=", "epoch=", "batch_size=", "learning_rate=", "learning_rate_D=", "learning_rate_M=", "threshold="])
+    except:
+        print("nope")
+        sys.exit(1)
+
+    for opt, arg in opts:
+        if (opt == "--epoch"):
+            epoch = int(arg)
+        if (opt == "--batch_size"):
+            batch_size = int(arg)
+        if (opt == "--learning_rate"):
+            learning_rate = float(arg)
+        if (opt == "--learning_rate_D"):
+            learning_rate_D = float(arg)
+        if (opt == "--learning_rate_M"):
+            learning_rate_M = float(arg)
+        if (opt == "--threshold"):
+            threshold = float(arg)
+        if (opt == "--train"):
+            if(arg == "source"):
+                flag = 1
+            if(arg == "adda"):
+                flag = 2
+        if(opt == "--test"):
+            if(arg == "source"):
+                flag = 3
+            if(arg == "adda"):
+                flag = 4
+
+    if(flag):
+        if(flag == 1):
+            if(epoch and batch_size and learning_rate and threshold):
+                train_source(batch_size=batch_size, learning_rate=learning_rate, epoch=epoch, threshold=threshold)
+            else:
+                train_source()
+        if(flag == 2):
+            if (epoch and batch_size and learning_rate_D and learning_rate_M and threshold):
+                train_adda(batch_size=batch_size, learning_rate_M=learning_rate_M, learning_rate_D=learning_rate_D, epoch=epoch, threshold=threshold)
+            else:
+                train_adda()
+        if(flag == 3):
+            test_soruce()
+        if (flag == 4):
+            test_adda()
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

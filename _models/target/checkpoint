@@ -1,2 +1,0 @@
-model_checkpoint_path: "target.ckpt"
-all_model_checkpoint_paths: "target.ckpt"
